@@ -488,10 +488,11 @@ class ImageSource:
 
         all_idx = np.arange(start, min(start + num, self.n))
         im *= self.amplitudes[all_idx, np.newaxis, np.newaxis]
-        if weights is not None:
-            im *= weights[all_idx, np.newaxis, np.newaxis]
         im = im.shift(-self.offsets[all_idx, :])
         im = self._apply_source_filters(im, all_idx)
+
+        if weights is not None:
+            im *= weights[all_idx, np.newaxis, np.newaxis]
 
         vol = im.backproject(self.rots[start : start + num, :, :])[0]
 
