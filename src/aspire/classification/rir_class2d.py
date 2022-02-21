@@ -148,6 +148,10 @@ class RIRClass2D(Class2D):
             )
         self._bispectrum = bispectrum_implementations[bispectrum_implementation]
 
+        self.classes = None
+        self.reflections = None
+        self.distances = None
+
     def classify(self, diagnostics=False):
         """
         This is the high level method to perform the 2D images classification.
@@ -197,6 +201,10 @@ class RIRClass2D(Class2D):
                 f"Count reflected: {np.sum(reflections)}"
                 f" {100 * np.mean(reflections) } %"
             )
+
+        self.classes = classes
+        self.reflections = reflections
+        self.distances = distances
 
         return classes, reflections, distances
 
@@ -266,6 +274,42 @@ class RIRClass2D(Class2D):
         """
         # _nn_classification is assigned during initialization.
         return self._nn_classification(coef_b, coef_b_r)
+
+    def get_nn_graph(self):
+        """
+        Return the Nearest Neighbors graph computed during class averaging
+        as a weighted adjacency list.
+
+        Vertices are indexed by their natural index in `source`.
+        Note reflected images are represented by `index + src.n`.
+
+        If you want a complete graph, specify src.n classes and 2*src.n neighbors.
+        This is potetially extremely large for real data sets.
+
+        Returns two arrays, an integer adjacency list (unweighted),
+        and a coresponding weight list.  Both should have shape
+        (n_classes, n_nbor) as configured for this instance..
+        """
+
+        # Check we have computed the NN data.
+        if any(x is None for x in (self.classes, self.reflections, self.distances)):
+            raise RuntimeError(f"Must run {self.__class__.__name__}.classify() first.")
+
+        # Instantiate storage for unweighted Adjacency List
+        adj_list = np.empty((self.n_classes, self.n_nbor), dtype=int)
+
+        # Unpack the edges from self.classes and self.reflections
+        for c, cls in enumerate(self.classes):
+
+            for j, vj in enumerate(cls):
+
+                if self.reflections[c][j]:
+                    vj += self.src.n
+
+                adj_list[c][j] = vj
+
+        # self.distances should already be the correct shape array
+        return adj_list, self.distances
 
     def bispectrum(self, coef):
         """
