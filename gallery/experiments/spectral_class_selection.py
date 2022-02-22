@@ -101,7 +101,7 @@ def custom_class_selector(self, classes, reflections):
 
     # Insert Smart Algo Here
     # ... something something ...
-    # selections =
+    # selections = ...
 
     return classes[selection], reflections[selection]
 
@@ -117,28 +117,63 @@ rir.select_classes = custom_class_selector
 
 
 # %%
-# Scratch
-# ^^^^^^^
+# Laplacian Helper Scratch
+# ------------------------
 #
 
+# First lets make a util to create a Laplacian from an Adjacency list
+def make_laplacian(
+    adj_list, wts=None, num_vertices=None, force_symmetric=False, dtype=np.float64
+):
+    """
+    Given an adj_list construct a basic Laplacian, optionally using `wts`.
+
+    `num_vertices` can be used to mask off the vertex set.
+    In this case, that might control whether we include reflections in our data.
+    """
+
+    if num_vertices is None:
+        num_vertices = len(adj_list)
+
+    if wts is None:
+        # Make a 2d thing, using one 1d object
+        m = np.max(adj_list) + 1
+        wts = [np.full(m, -1)] * m
+
+    # adjacency entries (negated)
+    L = np.zeros((num_vertices, num_vertices), dtype=dtype)
+    # degree entries
+    D = np.zeros(num_vertices, dtype=int)
+    for r, row in enumerate(adj_list):
+        vi = row[0]
+        if vi >= num_vertices:
+            continue
+        D[vi] += 1
+        for c, vj in enumerate(row[1:]):
+            if vj >= num_vertices:
+                continue
+            # weight is inversely proportional to distance, note negated
+            # print(num_vertices, vi,vj, r, c+1)
+            L[vi][vj] -= wts[r][c + 1]
+            if force_symmetric:
+                L[vj][vi] -= wts[r][c + 1]
+                D[vj] += 1
+
+    # L = D - A
+    # In this code we have L = D + L where L = -A currently.
+    # We do this to operate in place.
+    np.fill_diagonal(L, D)
+
+    return L
+
+
 # Let's take a look at the spectrum to see what we're working with.
-adj_list, wts_list = rir.get_nn_graph()
+adj_list, dist_list = rir.get_nn_graph()
 
 # First the unweighted Laplacian.
 # We'll symmetrize it, at least initially...
 #   otherwise with reflections this might get too weird.
-unweighted_L = np.zeros((2 * num_imgs, 2 * num_imgs), np.float64)
-for row in adj_list:
-    vi = row[0]
-    for vj in row[1:]:
-        unweighted_L[vi][vj] = -1
-        # Sym
-        unweighted_L[vj][vi] = -1
-
-# Compute the degree entries (for complete graph this is a lot easier than I've made it ;) )
-D = np.sum(unweighted_L, axis=1)
-# L = D-A
-np.fill_diagonal(unweighted_L, -D)
+unweighted_L = make_laplacian(adj_list, num_vertices=2 * num_imgs, force_symmetric=True)
 
 # What does the spectrum look like?
 lamb = np.linalg.eigvalsh(unweighted_L)
@@ -146,14 +181,10 @@ lamb = np.linalg.eigvalsh(unweighted_L)
 plt.semilogy(lamb[::-1])
 plt.show()
 
-# Cool, let's ignore reflections (we're missing half the set anyway, well, sort of)
-unrefl_unweighted_L = unweighted_L[:num_imgs, :num_imgs]
-# Reset diag to 0
-np.fill_diagonal(unrefl_unweighted_L, 0)
-# Compute the degree entries
-D = np.sum(unrefl_unweighted_L, axis=1)
-# L = D-A
-np.fill_diagonal(unrefl_unweighted_L, -D)
+# Cool, let's ignore the reflections
+unrefl_unweighted_L = make_laplacian(
+    adj_list, num_vertices=num_imgs, force_symmetric=True
+)
 
 # What does the spectrum look like?
 unrefl_lamb = np.linalg.eigvalsh(unrefl_unweighted_L)
@@ -162,20 +193,14 @@ plt.semilogy(unrefl_lamb[::-1])
 plt.show()
 
 
-# Now let's look at the directed weighted case.
-L = np.zeros((2 * num_imgs, 2 * num_imgs), np.float64)
-for r, row in enumerate(adj_list):
-    vi = row[0]
-    for c, vj in enumerate(row[1:]):
-        # weight is inversely proportional to distance
-        L[vi][vj] = 1 / wts_list[r][c + 1]
-# Compute the degree entries
-D = np.sum(unweighted_L, axis=1)
-# L = D-A
-np.fill_diagonal(L, -D)
+# Now let's look at the directed weighted case,
+# when weight is inversely proportional to distance.
+L = make_laplacian(
+    adj_list, wts=1.0 / rir.distances, num_vertices=num_imgs, force_symmetric=False
+)
 
-# What does this spectrum look like?
-lamb = np.linalg.eigvalsh(L)
+# What does this spectrum look like? (Note, we don't use `eigvalsh` here... and we should them sort)
+lamb = np.sort(np.linalg.eigvals(L))
 # Plot the spectrum, descending
 plt.semilogy(lamb[::-1])
 plt.show()
@@ -247,23 +272,15 @@ rir.classify()
 #
 
 # Let's take a look at the spectrum to see what we're working with.
-adj_list, wts_list = rir.get_nn_graph()
+adj_list, distances = rir.get_nn_graph()
+
+# Let's take a look at the spectrum to see what we're working with.
+adj_list, dist_list = rir.get_nn_graph()
 
 # First the unweighted Laplacian.
 # We'll symmetrize it, at least initially...
 #   otherwise with reflections this might get too weird.
-unweighted_L = np.zeros((2 * num_imgs, 2 * num_imgs), np.float64)
-for row in adj_list:
-    vi = row[0]
-    for vj in row[1:]:
-        unweighted_L[vi][vj] = -1
-        # Sym
-        unweighted_L[vj][vi] = -1
-
-# Compute the degree entries (for complete graph this is a lot easier than I've made it ;) )
-D = np.sum(unweighted_L, axis=1)
-# L = D-A
-np.fill_diagonal(unweighted_L, -D)
+unweighted_L = make_laplacian(adj_list, num_vertices=2 * num_imgs, force_symmetric=True)
 
 # What does the spectrum look like?
 lamb = np.linalg.eigvalsh(unweighted_L)
@@ -271,14 +288,10 @@ lamb = np.linalg.eigvalsh(unweighted_L)
 plt.semilogy(lamb[::-1])
 plt.show()
 
-# Cool, let's ignore reflections (we're missing half the set anyway, well, sort of)
-unrefl_unweighted_L = unweighted_L[:num_imgs, :num_imgs]
-# Reset diag to 0
-np.fill_diagonal(unrefl_unweighted_L, 0)
-# Compute the degree entries
-D = np.sum(unrefl_unweighted_L, axis=1)
-# L = D-A
-np.fill_diagonal(unrefl_unweighted_L, -D)
+# Cool, let's ignore the reflections
+unrefl_unweighted_L = make_laplacian(
+    adj_list, num_vertices=num_imgs, force_symmetric=True
+)
 
 # What does the spectrum look like?
 unrefl_lamb = np.linalg.eigvalsh(unrefl_unweighted_L)
@@ -287,22 +300,19 @@ plt.semilogy(unrefl_lamb[::-1])
 plt.show()
 
 
-# Now let's look at the directed weighted case.
-L = np.zeros((2 * num_imgs, 2 * num_imgs), np.float64)
-for r, row in enumerate(adj_list):
-    vi = row[0]
-    for c, vj in enumerate(row[1:]):
-        # weight is inversely proportional to distance
-        L[vi][vj] = 1 / wts_list[r][c + 1]
-# Compute the degree entries
-D = np.sum(unweighted_L, axis=1)
-# L = D-A
-np.fill_diagonal(L, -D)
+# Now let's look at the directed weighted case,
+# when weight is inversely proportional to distance.
+L = make_laplacian(
+    adj_list, wts=1.0 / rir.distances, num_vertices=num_imgs, force_symmetric=False
+)
 
-# What does this spectrum look like?
-lamb = np.linalg.eigvalsh(L)
+# What does this spectrum look like? (Note, we don't use `eigvalsh` here... and we should them sort)
+lamb = np.sort(np.linalg.eigvals(L))
 # Plot the spectrum, descending
 plt.semilogy(lamb[::-1])
 plt.show()
 
-## Good luck!
+# # From here extend look at various normalizations and kernels etc
+# #   until satisfied.
+
+# # Good luck!
