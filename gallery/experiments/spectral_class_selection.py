@@ -29,10 +29,15 @@ from aspire.volume import Volume
 
 logger = logging.getLogger(__name__)
 
+# %%
+# Complete NN Graph Sanity Check
+# ------------------------------
+# First we'll compute a complete graph and check the eigenvalues.
+# This should check for a few obvious problems.
 
 # %%
 # Parameters
-# ---------------
+# ^^^^^^^^^^
 # Configuration to compute a small (but complete) NN graph.
 
 img_size = 32  # Downsample the volume to a desired resolution
@@ -43,7 +48,7 @@ n_nbor = 2 * num_imgs  # How many neighbors to stack
 
 # %%
 # Simulation Data
-# ---------------
+# ^^^^^^^^^^^^^^^
 # Start with a fairly hi-res volume available from EMPIAR/EMDB.
 # https://www.ebi.ac.uk/emdb/EMD-2660
 # https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-2660/map/emd_2660.map.gz
@@ -66,7 +71,7 @@ src.cache()
 
 # %%
 # Class Averaging
-# ----------------------
+# ^^^^^^^^^^^^^^^
 #
 # Now perform classification and averaging for each class.
 
@@ -110,6 +115,131 @@ rir.select_classes = custom_class_selector
 # Continue on with averaging...
 # avgs = rir.averages(rir.classes, rir.reflections, rir.distances)
 
+
+# %%
+# Scratch
+# ^^^^^^^
+#
+
+# Let's take a look at the spectrum to see what we're working with.
+adj_list, wts_list = rir.get_nn_graph()
+
+# First the unweighted Laplacian.
+# We'll symmetrize it, at least initially...
+#   otherwise with reflections this might get too weird.
+unweighted_L = np.zeros((2 * num_imgs, 2 * num_imgs), np.float64)
+for row in adj_list:
+    vi = row[0]
+    for vj in row[1:]:
+        unweighted_L[vi][vj] = -1
+        # Sym
+        unweighted_L[vj][vi] = -1
+
+# Compute the degree entries (for complete graph this is a lot easier than I've made it ;) )
+D = np.sum(unweighted_L, axis=1)
+# L = D-A
+np.fill_diagonal(unweighted_L, -D)
+
+# What does the spectrum look like?
+lamb = np.linalg.eigvalsh(unweighted_L)
+# Plot the spectrum, descending
+plt.semilogy(lamb[::-1])
+plt.show()
+
+# Cool, let's ignore reflections (we're missing half the set anyway, well, sort of)
+unrefl_unweighted_L = unweighted_L[:num_imgs, :num_imgs]
+# Reset diag to 0
+np.fill_diagonal(unrefl_unweighted_L, 0)
+# Compute the degree entries
+D = np.sum(unrefl_unweighted_L, axis=1)
+# L = D-A
+np.fill_diagonal(unrefl_unweighted_L, -D)
+
+# What does the spectrum look like?
+unrefl_lamb = np.linalg.eigvalsh(unrefl_unweighted_L)
+# Plot the spectrum, descending
+plt.semilogy(unrefl_lamb[::-1])
+plt.show()
+
+
+# Now let's look at the directed weighted case.
+L = np.zeros((2 * num_imgs, 2 * num_imgs), np.float64)
+for r, row in enumerate(adj_list):
+    vi = row[0]
+    for c, vj in enumerate(row[1:]):
+        # weight is inversely proportional to distance
+        L[vi][vj] = 1 / wts_list[r][c + 1]
+# Compute the degree entries
+D = np.sum(unweighted_L, axis=1)
+# L = D-A
+np.fill_diagonal(L, -D)
+
+# What does this spectrum look like?
+lamb = np.linalg.eigvalsh(L)
+# Plot the spectrum, descending
+plt.semilogy(lamb[::-1])
+plt.show()
+
+## From here look at various normalizations and kernels etc
+##   until satisfied with complete graph.
+
+
+# %%
+# Truncated NN Graph
+# ------------------
+# Then repeat looking at actual (truncated) NN graph.
+# The parameters will be modified to
+# explore a larger number of images,
+# return all images' classes,
+# but with fewer neighbors in each class.
+
+# %%
+# Parameters
+# ^^^^^^^^^^
+# Configuration to compute a small experiment.
+
+img_size = 32  # Downsample the volume to a desired resolution
+num_imgs = 4000  # How many images in our source.
+n_classes = num_imgs  # How many class averages to compute.
+n_nbor = 200  # How many neighbors to stack
+
+# %%
+# Simulation Data
+# ^^^^^^^^^^^^^^^
+#
+
+# Create the Simulation
+src = Simulation(
+    L=v.resolution,
+    n=num_imgs,
+    vols=v,
+)
+
+# Cache to memory for some speedup
+src.cache()
+
+# %%
+# Class Averaging
+# ^^^^^^^^^^^^^^^
+# Now perform classification and averaging for each class.
+
+logger.info("Begin Class Averaging")
+
+rir = RIRClass2D(
+    src,  # Source used for classification
+    fspca_components=400,
+    bispectrum_components=300,  # Compressed Features after last PCA stage.
+    n_nbor=n_nbor,
+    n_classes=n_classes,
+    large_pca_implementation="legacy",
+    nn_implementation="sklearn",
+    bispectrum_implementation="legacy",
+)
+
+
+# Compute and populate the `rir` object with the class data
+# needed to generate and inspect the spectrum.
+rir.classify()
 
 # %%
 # Scratch
@@ -157,7 +287,7 @@ plt.semilogy(unrefl_lamb[::-1])
 plt.show()
 
 
-# Now let's look at the weighted case.
+# Now let's look at the directed weighted case.
 L = np.zeros((2 * num_imgs, 2 * num_imgs), np.float64)
 for r, row in enumerate(adj_list):
     vi = row[0]
@@ -175,7 +305,4 @@ lamb = np.linalg.eigvalsh(L)
 plt.semilogy(lamb[::-1])
 plt.show()
 
-## From here look at various normalizations and kernels etc
-##   until satisfied with complete graph.
-## Then repeat looking at actual (truncated) NN graph ...
 ## Good luck!
