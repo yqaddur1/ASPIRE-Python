@@ -95,6 +95,17 @@ rir = RIRClass2D(
 rir.classify()
 
 
+def random_class_selector(self, classes, reflections):
+
+    from np.random import default_rng
+
+    # Random without replacement
+    rng = default_rng()
+    selection = rng.choice(len(classes), size=self.n_classes, replace=False)
+
+    return classes[selection], reflections[selection]
+
+
 def custom_class_selector(self, classes, reflections):
 
     adj_list, wts_list = self.get_nn_graph()
