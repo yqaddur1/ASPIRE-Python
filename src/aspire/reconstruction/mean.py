@@ -50,7 +50,7 @@ class WeightedVolumesEstimator(Estimator):
         self.weights = weights
         self.r = self.weights.shape[1]
         super().__init__(*args, **kwargs)
-        assert self.n == self.weights.shape[0]
+        assert self.src.n == self.weights.shape[0]
 
     def __getattr__(self, name):
         if name == "precond_kernel":
@@ -79,22 +79,22 @@ class WeightedVolumesEstimator(Estimator):
         :return: r x r matrix of volumes, shaped (r, r, 2L, 2L, 2L).
         """
 
-        _2L = 2 * self.L
+        _2L = 2 * self.src.L
         # Note, because we're iteratively summing it is critical we zero this array.
         kernel = np.zeros((self.r, self.r, _2L, _2L, _2L), dtype=self.dtype)
-        sq_filters_f = self.src.eval_filter_grid(self.L, power=2)
+        sq_filters_f = np.square(evaluate_src_filters_on_grid(self.src))
 
         for k in range(self.r):
             for j in range(k + 1):
-                for i in range(0, self.n, self.batch_size):
+                for i in range(0, self.src.n, self.batch_size):
                     _range = np.arange(
-                        i, min(self.n, i + self.batch_size), dtype=np.int
+                        i, min(self.src.n, i + self.batch_size), dtype=int
                     )
-                    pts_rot = rotated_grids(self.L, self.src.rots[_range, :, :])
+                    pts_rot = rotated_grids(self.src.L, self.src.rots[_range, :, :])
                     weights = sq_filters_f[:, :, _range]
                     weights *= self.src.amplitudes[_range] ** 2
 
-                    if self.L % 2 == 0:
+                    if self.src.L % 2 == 0:
                         weights[0, :, :] = 0
                         weights[:, 0, :] = 0
 
@@ -102,13 +102,13 @@ class WeightedVolumesEstimator(Estimator):
                         self.weights[_range, j] * self.weights[_range, k]
                     ).reshape(1, 1, len(_range))
 
-                    pts_rot = m_reshape(pts_rot, (3, -1))
-                    weights = m_flatten(weights)
+                    pts_rot = pts_rot.reshape((3, -1))
+                    weights = np.transpose(weights, (2, 0, 1)).flatten()
 
                     batch_kernel = (
                         1
-                        / (2 * self.L ** 4)
-                        * anufft(weights, pts_rot, (_2L, _2L, _2L), real=True)
+                        / (2 * self.src.L**4)
+                        * anufft(weights, pts_rot[::-1], (_2L, _2L, _2L), real=True)
                     )
                     kernel[k, j] += batch_kernel
 
@@ -128,6 +128,7 @@ class WeightedVolumesEstimator(Estimator):
 
                 kernel[k, j] = mdim_ifftshift(kernel[k, j], range(0, 3))
                 kernel_f = fftn(kernel[k, j], axes=(0, 1, 2))
+
                 kernel_f = np.real(kernel_f)
                 kermat_f[k, j] = kernel_f
 
@@ -135,16 +136,20 @@ class WeightedVolumesEstimator(Estimator):
 
     def src_backward(self):
         # src_vols_wt_backward
-        mean_b = np.zeros((self.r, self.L, self.L, self.L), dtype=self.dtype)
+        mean_b = np.zeros(
+            (self.r, self.src.L, self.src.L, self.src.L), dtype=self.dtype
+        )
 
         for k in range(self.r):
-            for i in range(0, self.n, self.batch_size):
+            for i in range(0, self.src.n, self.batch_size):
                 im = self.src.images(i, self.batch_size)
 
-                batch_mean_b = self.src.im_backward(im, i, self.weights[:, k]) / self.n
+                batch_mean_b = (
+                    self.src.im_backward(im, i, self.weights[:, k]) / self.src.n
+                )
                 mean_b[k] += batch_mean_b.astype(self.dtype)
 
-        res = np.sqrt(self.n) * self.basis.evaluate_t(mean_b)
+        res = np.sqrt(self.src.n) * self.basis.evaluate_t(mean_b)
         logger.info(f"Determined weighted adjoint mappings. Shape = {res.shape}")
 
         return res
@@ -206,7 +211,9 @@ class WeightedVolumesEstimator(Estimator):
         if vol_coeff.ndim == 1:
             vol_coeff = vol_coeff.reshape(self.r, self.basis.count)
 
-        vols_out = np.zeros((self.r, self.L, self.L, self.L), dtype=self.dtype)
+        vols_out = np.zeros(
+            (self.r, self.src.L, self.src.L, self.src.L), dtype=self.dtype
+        )
 
         vol = self.basis.evaluate(vol_coeff)
 
