@@ -135,6 +135,13 @@ class WeightedVolumesEstimator(Estimator):
         return FourierKernelMat(kermat_f, centered=False)
 
     def src_backward(self):
+        """
+        Apply adjoint mapping to source
+
+        :return: The adjoint mapping applied to the images, averaged over the whole dataset and expressed
+            as coefficients of `basis`.
+        """
+
         # src_vols_wt_backward
         mean_b = np.zeros(
             (self.r, self.src.L, self.src.L, self.src.L), dtype=self.dtype
@@ -142,7 +149,7 @@ class WeightedVolumesEstimator(Estimator):
 
         for k in range(self.r):
             for i in range(0, self.src.n, self.batch_size):
-                im = self.src.images(i, self.batch_size)
+                im = self.src.images[i : i + self.batch_size]
 
                 batch_mean_b = (
                     self.src.im_backward(im, i, self.weights[:, k]) / self.src.n
@@ -199,6 +206,7 @@ class WeightedVolumesEstimator(Estimator):
     def apply_kernel(self, vol_coeff, kernel=None):
         """
         Applies the kernel represented by convolution
+
         :param vol_coeff: The volume to be convolved, stored in the basis coefficients.
         :param kernel: a Kernel object. If None, the kernel for this Estimator is used.
         :return: The result of evaluating `vol_coeff` in the given basis, convolving with the kernel given by
@@ -211,15 +219,15 @@ class WeightedVolumesEstimator(Estimator):
         if vol_coeff.ndim == 1:
             vol_coeff = vol_coeff.reshape(self.r, self.basis.count)
 
-        vols_out = np.zeros(
-            (self.r, self.src.L, self.src.L, self.src.L), dtype=self.dtype
+        vols_out = Volume(
+            np.zeros((self.r, self.src.L, self.src.L, self.src.L), dtype=self.dtype)
         )
 
         vol = self.basis.evaluate(vol_coeff)
 
         for k in range(self.r):
             for j in range(self.r):
-                vols_out[k] += kernel.convolve_volume(vol[j], j, k)
+                vols_out[k] += Volume(kernel.convolve_volume(vol[j], j, k))
                 # Note this is where we would add mask_gamma
 
         vol_coeff = self.basis.evaluate_t(vols_out)
@@ -256,7 +264,7 @@ class MeanEstimator(WeightedVolumesEstimator):
 
         for i in range(0, self.src.n, self.batch_size):
             _range = np.arange(i, min(self.src.n, i + self.batch_size), dtype=int)
-            pts_rot = rotated_grids(self.src.L, self.src.rots[_range, :, :])
+            pts_rot = rotated_grids(self.src.L, self.src.rotations[_range, :, :])
             weights = sq_filters_f[:, :, _range]
             weights *= self.src.amplitudes[_range] ** 2
 

@@ -9,7 +9,6 @@ matrix and the voting method, based on simulated data projected from a 3D cryo-E
 import logging
 import os
 
-import mrcfile
 import numpy as np
 
 from aspire.abinitio import CLSyncVoting
@@ -62,14 +61,13 @@ filters = [
 # ------------
 
 # Load the map file of a 70S Ribosome and downsample the 3D map to desired resolution.
-# The downsampling should be done by the internal function of Volume object in future.
+# The downsampling can be done by the internal function of Volume object.
 logger.info(
     f"Load 3D map and downsample 3D map to desired grids "
     f"of {img_size} x {img_size} x {img_size}."
 )
-infile = mrcfile.open(os.path.join(DATA_DIR, "clean70SRibosome_vol_65p.mrc"))
-vols = Volume(infile.data.astype(dtype))
-vols = vols.downsample((img_size,) * 3)
+vols = Volume.load(os.path.join(DATA_DIR, "clean70SRibosome_vol_65p.mrc"), dtype=dtype)
+vols = vols.downsample(img_size)
 
 # %%
 # Create Simulation Object and Obtain True Rotation Angles
@@ -80,7 +78,7 @@ logger.info("Use downsampled map to creat simulation object.")
 sim = Simulation(L=img_size, n=num_imgs, vols=vols, unique_filters=filters, dtype=dtype)
 
 logger.info("Get true rotation angles generated randomly by the simulation object.")
-rots_true = sim.rots
+rots_true = sim.rotations
 
 # %%
 # Estimate Orientation and Rotation Angles

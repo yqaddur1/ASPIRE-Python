@@ -6,6 +6,7 @@ from aspire.image import Image
 from aspire.utils import gaussian_2d, utest_tolerance
 from aspire.utils.coor_trans import grid_2d
 from aspire.utils.random import randn
+from aspire.volume import Volume
 
 
 class Steerable2DMixin:
@@ -118,13 +119,46 @@ class Steerable2DMixin:
         if isinstance(Au, Image):
             Au = Au.asnumpy()
 
-        x = randn(*self.basis.sz, seed=self.seed)
-        x = x.astype(self.dtype)
+        x = Image(randn(*self.basis.sz, seed=self.seed), dtype=self.dtype)
 
         ATx = self.basis.evaluate_t(x)
 
-        Au_dot_x = np.sum(Au * x)
+        Au_dot_x = np.sum(Au * x.asnumpy())
         u_dot_ATx = np.sum(u * ATx)
 
         self.assertTrue(Au_dot_x.shape == u_dot_ATx.shape)
         self.assertTrue(np.isclose(Au_dot_x, u_dot_ATx))
+
+
+class UniversalBasisMixin:
+    def getClass(self):
+        if self.basis.ndim == 2:
+            return Image
+        elif self.basis.ndim == 3:
+            return Volume
+
+    def testEvaluate(self):
+        # evaluate should take a NumPy array and return an Image/Volume
+        _class = self.getClass()
+        result = self.basis.evaluate(np.zeros((self.basis.count), dtype=self.dtype))
+        self.assertTrue(isinstance(result, _class))
+
+    def testEvaluate_t(self):
+        # evaluate_t should take an Image/Volume and return a NumPy array
+        _class = self.getClass()
+        result = self.basis.evaluate_t(
+            _class(np.zeros((self.L,) * self.basis.ndim, dtype=self.dtype))
+        )
+        self.assertTrue(isinstance(result, np.ndarray))
+
+    def testExpand(self):
+        _class = self.getClass()
+        # expand should take an Image/Volume and return a NumPy array
+        result = self.basis.expand(
+            _class(np.zeros((self.L,) * self.basis.ndim, dtype=self.dtype))
+        )
+        self.assertTrue(isinstance(result, np.ndarray))
+
+    def testInitWithIntSize(self):
+        # make sure we can instantiate with just an int as a shortcut
+        self.assertEqual((self.L,) * self.basis.ndim, self.basis.__class__(self.L).sz)
