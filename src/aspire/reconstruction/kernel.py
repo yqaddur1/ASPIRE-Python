@@ -6,6 +6,7 @@ from scipy.fftpack import fft, fftn, fftshift, ifft, ifftn
 from aspire.utils import roll_dim, unroll_dim, vec_to_vol, vecmat_to_volmat, vol_to_vec
 from aspire.utils.fft import mdim_fftshift, mdim_ifftshift
 from aspire.utils.matlab_compat import m_reshape
+from aspire.volume import Volume
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,13 @@ class FourierKernel(Kernel):
         :param x: An N-by-N-by-N-by-... array of volumes to be convolved.
         :return: The original volumes convolved by the kernel with the same dimensions as before.
         """
+        if isinstance(x, Volume):
+            x = x.asnumpy()
+
+        if x.ndim == 3:
+            x = x[np.newaxis, ...]
+
+        x = np.transpose(x, (1, 2, 3, 0))
         N = x.shape[0]
         kernel_f = self.kernel[..., np.newaxis]
         N_ker = kernel_f.shape[0]
@@ -107,7 +115,7 @@ class FourierKernel(Kernel):
 
         x = roll_dim(x, sz_roll)
 
-        return np.real(x)
+        return np.transpose(np.real(x), (3, 0, 1, 2))
 
     def convolve_volume_matrix(self, x):
         """
@@ -154,7 +162,7 @@ class FourierKernel(Kernel):
 
         A = np.eye(L**3, dtype=self.dtype)
         for i in range(L**3):
-            A[:, i] = np.real(vol_to_vec(self.convolve_volume(vec_to_vol(A[:, i]))))
+            A[:, i] = np.real(vol_to_vec(self.convolve_volume(vec_to_vol(A[:, i]))[0]))
 
         A = vecmat_to_volmat(A)
         return A

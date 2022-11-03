@@ -65,10 +65,11 @@ class Estimator:
         """Return an estimate as a Volume instance."""
         if b_coeff is None:
             b_coeff = self.src_backward()
-        # conj_grad expects a 1d array if n = 1
-        b_coeff = np.squeeze(b_coeff, axis=0)
+        # xxx # conj_grad expects a 1d array if n = 1
+        # b_coeff = np.squeeze(b_coeff, axis=0)
         est_coeff = self.conj_grad(b_coeff, tol=tol)
         est = np.transpose(self.basis.evaluate(est_coeff), (0, 3, 2, 1))
+        # est = self.basis.evaluate(est_coeff)
 
         return est
 
@@ -82,7 +83,7 @@ class Estimator:
         """
         if kernel is None:
             kernel = self.kernel
-        vol = self.basis.evaluate(vol_coeff)
-        vol = kernel.convolve_volume(vol)
+        vol = self.basis.evaluate(vol_coeff)  # return volume
+        vol = Volume(kernel.convolve_volume(vol))
         vol_coef = self.basis.evaluate_t(vol)
         return vol_coef

@@ -11,7 +11,7 @@ from aspire.nufft import anufft
 from aspire.operators import evaluate_src_filters_on_grid
 from aspire.reconstruction import Estimator, FourierKernel, FourierKernelMat
 from aspire.utils.fft import mdim_ifftshift
-from aspire.volume import rotated_grids
+from aspire.volume import Volume, rotated_grids
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,9 @@ class WeightedVolumesEstimator(Estimator):
                     _range = np.arange(
                         i, min(self.src.n, i + self.batch_size), dtype=int
                     )
-                    pts_rot = rotated_grids(self.src.L, self.src.rots[_range, :, :])
+                    pts_rot = rotated_grids(
+                        self.src.L, self.src.rotations[_range, :, :]
+                    )
                     weights = sq_filters_f[:, :, _range]
                     weights *= self.src.amplitudes[_range] ** 2
 
@@ -227,7 +229,7 @@ class WeightedVolumesEstimator(Estimator):
 
         for k in range(self.r):
             for j in range(self.r):
-                vols_out[k] += Volume(kernel.convolve_volume(vol[j], j, k))
+                vols_out[k] += kernel.convolve_volume(vol[j], j, k)
                 # Note this is where we would add mask_gamma
 
         vol_coeff = self.basis.evaluate_t(vols_out)
