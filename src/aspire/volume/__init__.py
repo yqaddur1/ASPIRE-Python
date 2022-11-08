@@ -98,6 +98,26 @@ class Volume:
         """
         return Volume(self.asnumpy().astype(dtype))
 
+    @staticmethod
+    def empty_like(v):
+        """
+        Return a new empty volume instance with the shape and dtype of `v`.
+
+        :param v: Volume instance
+        :return: Volume instance
+        """
+        return Volume(np.empty(v.shape, dtype=v.dtype))
+
+    @staticmethod
+    def zeros_like(v):
+        """
+        Return a new zeros volume instance with the shape and dtype of `v`.
+
+        :param v: Volume instance
+        :return: Volume instance
+        """
+        return Volume(np.zeros(v.shape, dtype=v.dtype))
+
     def __getitem__(self, item):
         # this is one reason why you might want Volume and VolumeStack classes...
         # return Volume(self._data[item])

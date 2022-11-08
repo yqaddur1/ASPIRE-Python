@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from scipy.fftpack import fft, fftn, fftshift, ifft, ifftn
 
-from aspire.utils import roll_dim, unroll_dim, vec_to_vol, vecmat_to_volmat, vol_to_vec
+from aspire.utils import roll_dim, unroll_dim, vecmat_to_volmat
 from aspire.utils.fft import mdim_fftshift, mdim_ifftshift
 from aspire.utils.matlab_compat import m_reshape
 from aspire.volume import Volume
@@ -75,47 +75,45 @@ class FourierKernel(Kernel):
 
         return fftshift(kernel_circ, dim)
 
-    def convolve_volume(self, x):
+    def convolve_volume(self, x, in_place=False):
         """
         Convolve volume with kernel
 
-        :param x: An N-by-N-by-N-by-... array of volumes to be convolved.
-        :return: The original volumes convolved by the kernel with the same dimensions as before.
+        :param x: A Volume instance
+        :param in_plane: Operate on Volume `x` in place.  Optional bool, defaults False.
+            This saves memory in exchange for mutating the input data.
+        :return: Volume instance convolved by the kernel with the same dimensions as before.
         """
-        if isinstance(x, Volume):
-            x = x.asnumpy()
+        if not isinstance(x, Volume):
+            x = Volume(x)
 
-        if x.ndim == 3:
-            x = x[np.newaxis, ...]
-
-        x = np.transpose(x, (1, 2, 3, 0))
-        N = x.shape[0]
+        # x = np.transpose(x, (1, 2, 3, 0))
+        N = x.resolution
         kernel_f = self.kernel[..., np.newaxis]
         N_ker = kernel_f.shape[0]
 
-        x, sz_roll = unroll_dim(x, 4)
-        assert x.shape[0] == x.shape[1] == x.shape[2] == N, "Volumes in x must be cubic"
         assert kernel_f.shape[3] == 1, "Convolution kernel must be cubic"
         assert len(set(kernel_f.shape[:3])) == 1, "Convolution kernel must be cubic"
 
-        is_singleton = x.shape[3] == 1
+        is_singleton = len(x) == 1
 
         if is_singleton:
-            x = fftn(x[..., 0], (N_ker, N_ker, N_ker))[..., np.newaxis]
+            x_f = fftn(x.T[0], (N_ker, N_ker, N_ker))[..., np.newaxis]
         else:
             raise NotImplementedError("not yet")
 
-        x = x * kernel_f
+        x_f = x_f * kernel_f
+
+        # `in_place` mutates the original volume
+        if not in_place:
+            x = Volume.empty_like(x)
 
         if is_singleton:
-            x[..., 0] = np.real(ifftn(x[..., 0]))
-            x = x[:N, :N, :N, :]
+            x[0] = np.real(ifftn(x_f[..., 0])[:N, :N, :N])
         else:
             raise NotImplementedError("not yet")
 
-        x = roll_dim(x, sz_roll)
-
-        return np.transpose(np.real(x), (3, 0, 1, 2))
+        return x
 
     def convolve_volume_matrix(self, x):
         """
@@ -160,11 +158,22 @@ class FourierKernel(Kernel):
         if L is None:
             L = int(self.M / 2)
 
-        A = np.eye(L**3, dtype=self.dtype)
-        for i in range(L**3):
-            A[:, i] = np.real(vol_to_vec(self.convolve_volume(vec_to_vol(A[:, i]))[0]))
+        # A = np.eye(L**3, dtype=self.dtype)
+        # for i in range(L**3):
+        #     # I don't like that transpose...
+        #     A[:,i] = self.convolve_volume(A[:,i].reshape((L,)*3)).T.flatten()
+        # A = vecmat_to_volmat(A)
 
-        A = vecmat_to_volmat(A)
+        A = Volume(np.eye(L**3, dtype=self.dtype).reshape((L**3, L, L, L)))
+        for i in range(L**3):
+            #     A[i] = self.convolve_volume(A[i])[0].T
+            A[i] = self.convolve_volume(A[i])[0]
+        #    A[i] = self.convolve_volume(A[i])[0]
+
+        # A = vecmat_to_volmat(A.asnumpy().reshape(L**3, L**3))
+        A = vecmat_to_volmat(A.T.asnumpy().reshape(L**3, L**3))
+        # A = A.T.asnumpy().reshape((L,)*6)
+
         return A
 
 
