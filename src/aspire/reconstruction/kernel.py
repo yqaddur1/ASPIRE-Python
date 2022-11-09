@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from scipy.fftpack import fft, fftn, fftshift, ifft, ifftn
 
-from aspire.utils import roll_dim, unroll_dim, vecmat_to_volmat
+from aspire.utils import roll_dim, unroll_dim
 from aspire.utils.fft import mdim_fftshift, mdim_ifftshift
 from aspire.utils.matlab_compat import m_reshape
 from aspire.volume import Volume
@@ -158,21 +158,12 @@ class FourierKernel(Kernel):
         if L is None:
             L = int(self.M / 2)
 
-        # A = np.eye(L**3, dtype=self.dtype)
-        # for i in range(L**3):
-        #     # I don't like that transpose...
-        #     A[:,i] = self.convolve_volume(A[:,i].reshape((L,)*3)).T.flatten()
-        # A = vecmat_to_volmat(A)
-
         A = Volume(np.eye(L**3, dtype=self.dtype).reshape((L**3, L, L, L)))
         for i in range(L**3):
-            #     A[i] = self.convolve_volume(A[i])[0].T
             A[i] = self.convolve_volume(A[i])[0]
-        #    A[i] = self.convolve_volume(A[i])[0]
 
-        # A = vecmat_to_volmat(A.asnumpy().reshape(L**3, L**3))
-        A = vecmat_to_volmat(A.T.asnumpy().reshape(L**3, L**3))
-        # A = A.T.asnumpy().reshape((L,)*6)
+        # m_mmmm
+        A = A.T.asnumpy().reshape((L**3, L**3)).T.reshape((L,)*6).T
 
         return A
 
