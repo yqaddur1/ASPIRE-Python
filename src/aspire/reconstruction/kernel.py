@@ -163,7 +163,7 @@ class FourierKernel(Kernel):
             A[i] = self.convolve_volume(A[i])[0]
 
         # m_mmmm
-        A = A.T.asnumpy().reshape((L**3, L**3)).T.reshape((L,)*6).T
+        A = A.T.asnumpy().reshape((L**3, L**3)).T.reshape((L,) * 6).T
 
         return A
 
