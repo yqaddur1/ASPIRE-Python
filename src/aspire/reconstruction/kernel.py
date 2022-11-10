@@ -98,7 +98,7 @@ class FourierKernel(Kernel):
         is_singleton = len(x) == 1
 
         if is_singleton:
-            x_f = fftn(x.T[0], (N_ker, N_ker, N_ker))[..., np.newaxis]
+            x_f = fftn(x[0], (N_ker, N_ker, N_ker))[..., np.newaxis]
         else:
             raise NotImplementedError("not yet")
 
