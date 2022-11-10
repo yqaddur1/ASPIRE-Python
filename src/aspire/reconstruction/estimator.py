@@ -3,7 +3,6 @@ import logging
 import numpy as np
 
 from aspire.reconstruction.kernel import FourierKernel
-from aspire.volume import Volume
 
 logger = logging.getLogger(__name__)
 
