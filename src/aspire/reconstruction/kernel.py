@@ -3,7 +3,6 @@ import logging
 import numpy as np
 from scipy.fftpack import fft, fftn, fftshift, ifft, ifftn
 
-from aspire.utils import roll_dim, unroll_dim
 from aspire.utils.fft import mdim_fftshift, mdim_ifftshift
 from aspire.utils.matlab_compat import m_reshape
 from aspire.volume import Volume
@@ -87,7 +86,6 @@ class FourierKernel(Kernel):
         if not isinstance(x, Volume):
             x = Volume(x)
 
-        # x = np.transpose(x, (1, 2, 3, 0))
         N = x.resolution
         kernel_f = self.kernel[..., np.newaxis]
         N_ker = kernel_f.shape[0]
@@ -196,33 +194,37 @@ class FourierKernelMat(FourierKernel):
                 ).circularize()
         return xx
 
-    def convolve_volume(self, x, k, j):
-        N = x.shape[0]
+    def convolve_volume(self, x, k, j, in_place=False):
+
+        if not isinstance(x, Volume):
+            x = Volume(x)
+
+        N = x.resolution
         kernel_f = self.kermat[k, j, ..., np.newaxis]
         N_ker = kernel_f.shape[0]
-        x, sz_roll = unroll_dim(x, 4)
-        assert x.shape[0] == x.shape[1] == x.shape[2] == N, "Volumes in x must be cubic"
+
         assert kernel_f.shape[3] == 1, "Convolution kernel must be cubic"
         assert len(set(kernel_f.shape[:3])) == 1, "Convolution kernel must be cubic"
 
-        is_singleton = x.shape[3] == 1
+        is_singleton = len(x) == 1
 
         if is_singleton:
-            x = fftn(x[..., 0], (N_ker, N_ker, N_ker))[..., np.newaxis]
+            x_f = fftn(x[0], (N_ker, N_ker, N_ker))[..., np.newaxis]
         else:
             raise NotImplementedError("not yet")
 
-        x = x * kernel_f
+        x_f = x_f * kernel_f
+
+        # `in_place` mutates the original volume
+        if not in_place:
+            x = Volume.empty_like(x)
 
         if is_singleton:
-            x[..., 0] = np.real(ifftn(x[..., 0]))
-            x = x[:N, :N, :N, :]
+            x[0] = np.real(ifftn(x_f[..., 0])[:N, :N, :N])
         else:
             raise NotImplementedError("not yet")
 
-        x = roll_dim(x, sz_roll)
-
-        return np.real(x)
+        return x
 
     def convolve_volume_matrix(self, x):
         raise NotImplementedError("Not implemented for Fourier Kernel Matrix")
