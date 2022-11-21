@@ -145,8 +145,8 @@ class WeightedVolumesEstimator(Estimator):
         """
 
         # src_vols_wt_backward
-        mean_b = np.zeros(
-            (self.r, self.src.L, self.src.L, self.src.L), dtype=self.dtype
+        mean_b = Volume(
+            np.zeros((self.r, self.src.L, self.src.L, self.src.L), dtype=self.dtype)
         )
 
         for k in range(self.r):
@@ -163,11 +163,10 @@ class WeightedVolumesEstimator(Estimator):
 
         return res
 
-    def conj_grad(self, b_coeff, tol=None):
-        n = b_coeff.shape[-1]
+    def conj_grad(self, b_coeff, tol=1e-5, regularizer=0):
+        n = b_coeff.shape[-1]  # 0???
         kernel = self.kernel
 
-        regularizer = config.mean.regularizer
         if regularizer > 0:
             kernel += regularizer
 
