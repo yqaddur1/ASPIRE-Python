@@ -30,7 +30,7 @@ setup(
         "joblib",
         "matplotlib>=3.2.0",
         "mrcfile",
-        "numpy==1.21.5",
+        "numpy==1.22.4",
         "packaging",
         "pandas==1.3.5",
         "psutil",
