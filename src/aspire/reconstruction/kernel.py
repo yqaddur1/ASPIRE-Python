@@ -1,9 +1,8 @@
 import logging
 
 import numpy as np
-from scipy.fftpack import fft, fftn, fftshift, ifft, ifftn
 
-from aspire.utils.fft import mdim_fftshift, mdim_ifftshift
+from aspire.numeric import fft
 from aspire.utils.matlab_compat import m_reshape
 from aspire.volume import Volume
 
@@ -44,14 +43,14 @@ class FourierKernel(Kernel):
 
     def circularize(self):
         logger.info("Circularizing kernel")
-        kernel = np.real(ifftn(self.kernel))
-        kernel = mdim_fftshift(kernel)
+        kernel = np.real(fft.ifftn(self.kernel))
+        kernel = fft.mdim_fftshift(kernel)
 
         for dim in range(self.ndim):
             logger.info(f"Circularizing dimension {dim}")
             kernel = self.circularize_1d(kernel, dim)
 
-        xx = fftn(mdim_ifftshift(kernel))
+        xx = fft.fftn(fft.mdim_ifftshift(kernel))
         return xx
 
     def circularize_1d(self, kernel, dim):
@@ -72,7 +71,7 @@ class FourierKernel(Kernel):
         mult = m_reshape((np.arange(N, 0, -1, dtype=self.dtype) / N), mult_shape)
         kernel_circ += mult * bottom
 
-        return fftshift(kernel_circ, dim)
+        return fft.fftshift(kernel_circ, dim)
 
     def convolve_volume(self, x, in_place=False):
         """
@@ -96,7 +95,9 @@ class FourierKernel(Kernel):
         is_singleton = len(x) == 1
 
         if is_singleton:
-            x_f = fftn(x[0], (N_ker, N_ker, N_ker))[..., np.newaxis]
+            pad_width = [(0, N_ker - N)] * 3
+            _x = np.pad(x[0], pad_width)
+            x_f = fft.fftn(_x)[..., np.newaxis]
         else:
             raise NotImplementedError("not yet")
 
@@ -107,7 +108,7 @@ class FourierKernel(Kernel):
             x = Volume.empty_like(x)
 
         if is_singleton:
-            x[0] = np.real(ifftn(x_f[..., 0])[:N, :N, :N])
+            x[0] = np.real(fft.ifftn(x_f[..., 0])[:N, :N, :N])
         else:
             raise NotImplementedError("not yet")
 
@@ -132,15 +133,17 @@ class FourierKernel(Kernel):
 
         # Note from MATLAB code:
         # Order is important here.  It's about 20% faster to run from 1 through 6 compared with 6 through 1.
-        # TODO: Experiment with scipy order; try overwrite_x argument
+        # TODO: Experiment with fft axis order
         for i in range(6):
-            x = fft(x, N_ker, i, overwrite_x=True)
+            _pad_width = [(0, 0)] * 6
+            _pad_width[i] = (0, N_ker - N)
+            x = fft.fft(np.pad(x, _pad_width), axis=i)
 
         x *= kernel_f
 
         indices = list(range(N))
         for i in range(5, -1, -1):
-            x = ifft(x, None, i, overwrite_x=True)
+            x = fft.ifft(x, axis=i)
             x = x.take(indices, axis=i)
 
         return np.real(x)
@@ -209,7 +212,9 @@ class FourierKernelMat(FourierKernel):
         is_singleton = len(x) == 1
 
         if is_singleton:
-            x_f = fftn(x[0], (N_ker, N_ker, N_ker))[..., np.newaxis]
+            pad_width = [(0, N_ker - N)] * 3
+            _x = np.pad(x[0], pad_width)
+            x_f = fft.fftn(_x)[..., np.newaxis]
         else:
             raise NotImplementedError("not yet")
 
@@ -220,7 +225,7 @@ class FourierKernelMat(FourierKernel):
             x = Volume.empty_like(x)
 
         if is_singleton:
-            x[0] = np.real(ifftn(x_f[..., 0])[:N, :N, :N])
+            x[0] = np.real(fft.ifftn(x_f[..., 0])[:N, :N, :N])
         else:
             raise NotImplementedError("not yet")
 

@@ -2,15 +2,14 @@ import logging
 from functools import partial
 
 import numpy as np
-from scipy.fftpack import fftn
 from scipy.linalg import norm
 from scipy.sparse.linalg import LinearOperator, cg
 
 from aspire import config
 from aspire.nufft import anufft
+from aspire.numeric import fft
 from aspire.operators import evaluate_src_filters_on_grid
 from aspire.reconstruction import Estimator, FourierKernel, FourierKernelMat
-from aspire.utils.fft import mdim_ifftshift
 from aspire.volume import Volume, rotated_grids
 
 logger = logging.getLogger(__name__)
@@ -128,8 +127,8 @@ class WeightedVolumesEstimator(Estimator):
                 kernel[k, j, :, 0, :] = 0
                 kernel[k, j, :, :, 0] = 0
 
-                kernel[k, j] = mdim_ifftshift(kernel[k, j], range(0, 3))
-                kernel_f = fftn(kernel[k, j], axes=(0, 1, 2))
+                kernel[k, j] = fft.mdim_ifftshift(kernel[k, j], range(0, 3))
+                kernel_f = fft.fftn(kernel[k, j], axes=(0, 1, 2))
 
                 kernel_f = np.real(kernel_f)
                 kermat_f[k, j] = kernel_f
@@ -288,8 +287,8 @@ class MeanEstimator(WeightedVolumesEstimator):
         kernel[:, :, 0] = 0
 
         logger.info("Computing non-centered Fourier Transform")
-        kernel = mdim_ifftshift(kernel, range(0, 3))
-        kernel_f = fftn(kernel, axes=(0, 1, 2))
+        kernel = fft.mdim_ifftshift(kernel, range(0, 3))
+        kernel_f = fft.fftn(kernel, axes=(0, 1, 2))
         kernel_f = np.real(kernel_f)
 
         return FourierKernel(kernel_f, centered=False)
