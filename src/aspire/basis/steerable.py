@@ -1,7 +1,10 @@
 import logging
 from collections.abc import Iterable
+from collections import OrderedDict
 
 import numpy as np
+
+from scipy.optimize import minimize_scalar
 
 from aspire.basis import Basis
 from aspire.utils import complex_type
@@ -24,6 +27,116 @@ class SteerableBasis2D(Basis):
         self._zero_angular_inds = self.angular_indices == 0
         self._pos_angular_inds = (self.signs_indices == 1) & (self.angular_indices != 0)
         self._neg_angular_inds = self.signs_indices == -1
+
+    def get_max_filter_implementations(self):
+        return {
+            "companion": self.max_filter_companion,
+            "scipy": self.max_filter_scipy
+        }
+
+    def max_filter_bank(self, complex_coef, template_bank, max_filter_method):
+        """
+        NOTE THIS IS ONLY FOR NONNEGATIVE K
+        Method
+        want to get positive coefs, 
+        arrange them into vectors based on positive angular index
+        take hermitian product
+        create matrix
+        get eigenvalues
+        check which are unit and find roots and find max
+        :param filter_bank is a list of dictionaries. 
+                Length is number of templates, keys are angular indices, values are numpy complex coefficients
+        :return:
+        """
+
+        # want to max-filter with coefficients due to high dimensionality of images coordinate-basis
+
+        num_templates = len(template_bank)
+
+        max_filter_output = []
+        max_filter_output_refl = []
+
+        reflected_coef = self.reflection_transformation(complex_coef.copy())
+
+        for i in range(num_templates):
+            maxval = max_filter_method(complex_coef, template_bank[i])
+            max_filter_output.append(maxval)
+            maxval_refl = max_filter_method(reflected_coef, template_bank[i])
+            max_filter_output_refl.append(maxval_refl)
+
+        return max_filter_output, max_filter_output_refl
+    
+    def reflection_transformation(self, complex_coef):
+        fixed_angular_indices = self.fixed_angular_indices
+        for k, k_indices in fixed_angular_indices.items():
+            complex_coef[k_indices] = np.power(-1, k)*np.conj(complex_coef[k_indices])
+        return complex_coef
+    
+    def max_filter_scipy_objective(self, theta):
+        current_value = 0
+        for k, inner_k in self.inner_products_temp.items():
+            current_value += np.real(inner_k*np.exp(1j*k*theta))
+        return -current_value
+
+    def max_filter_scipy(self, complex_coef, template):
+        fixed_angular_indices = self.fixed_angular_indices
+        k_max = self.k_max
+
+        inner_products = {}
+        for k, k_indices in fixed_angular_indices.items():
+            zk = complex_coef[k_indices]
+            wk = template[k_indices]
+            inner_products[k] = np.vdot(zk,wk)
+        self.inner_products_temp = inner_products
+
+        res = minimize_scalar(self.max_filter_scipy_objective, method='bounded', bounds=(0, 2*np.pi))
+        return -res.fun
+
+    def max_filter_companion(self, complex_coef, template):
+        
+        fixed_angular_indices = self.fixed_angular_indices
+        k_max = self.k_max
+
+        inner_products = {}
+        for k, k_indices in fixed_angular_indices.items():
+            zk = complex_coef[k_indices]
+            wk = template[k_indices]
+            inner_products[k] = np.vdot(zk,wk)
+        inner_k_max = inner_products.pop(k_max)
+        denominator = k_max * inner_k_max
+
+        last_row = np.zeros(2*k_max, dtype = complex)
+
+        last_row[0] = - np.conj(inner_k_max)/inner_k_max
+        for k, inner_k in inner_products.items():
+            last_row[k_max - k] = - k * np.conj(inner_k)/denominator
+            last_row[k_max + k] = k * inner_k/denominator
+
+        companion = np.diag(np.ones(2*k_max - 1, dtype = complex), +1)
+        companion[-1] = (-1)*last_row
+        #print(companion)
+        evals = np.linalg.eigvals(companion)
+        units = []
+        #print(evals)
+
+        for ev in evals:
+            mod = np.abs(ev)
+            if np.allclose(mod, 1):
+                units.append(ev)
+        #print(units)
+        args = np.angle(units)
+
+        max_value = -np.inf
+        for theta in args:
+            current_value = np.real(inner_k_max*np.exp(1j*k_max*theta))
+            for k, inner_k in inner_products.items():
+                current_value += np.real(inner_k*np.exp(1j*k*theta))
+            if current_value > max_value:
+                max_value = current_value
+        
+        return max_value
+
+
 
     def calculate_bispectrum(
         self, complex_coef, flatten=False, filter_nonzero_freqs=False, freq_cutoff=None
@@ -72,6 +185,8 @@ class SteerableBasis2D(Basis):
         # Compute the set of all unique q in the compressed basis
         #   Note that np.unique is also sorted.
         unique_radial_indices = np.unique(radial_indices)
+
+        #$# TASK: UNDERSTAND COMPRESSION
 
         # When compressed, we need maps between the basis and uncompressed set of q
         #   to a reduced set of q that remain after compression.

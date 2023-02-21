@@ -18,6 +18,7 @@ class FBBasisMixin(object):
         Generate zeros of Bessel functions
         """
         # get upper_bound of zeros of Bessel functions
+        #$# seems like upper bound on angular see eq 14 (kmax) in fast paper
         upper_bound = min(self.ell_max + 1, 2 * self.nres + 1)
 
         # List of number of zeros
@@ -25,6 +26,7 @@ class FBBasisMixin(object):
         # List of zero values (each entry is an ndarray; all of possibly different lengths)
         zeros = []
 
+        #$# for each nonneg angular freq until no zeros or upper bound
         for ell in range(upper_bound):
             # for each ell, num_besselj_zeros returns the zeros of the
             # order ell Bessel function which are less than 2*pi*c*R = nres*pi/2,
@@ -41,9 +43,11 @@ class FBBasisMixin(object):
                 zeros.append(_zeros)
 
         #  get maximum number of ell
+        #$# actual kmax
         self.ell_max = len(n) - 1
 
         #  set the maximum of k for each ell
+        #$#  number of radial indices for each angular
         self.k_max = np.array(n, dtype=int)
 
         # set the zeros for each ell

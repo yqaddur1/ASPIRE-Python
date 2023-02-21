@@ -56,6 +56,7 @@ class FBBasis2D(SteerableBasis2D, FBBasisMixin):
         self._calc_k_max()
 
         # calculate total number of basis functions
+        #$# how many coefs in totality (roots over 2*kmax summation)
         self.count = self.k_max[0] + sum(2 * self.k_max[1:])
 
         # obtain a 2D grid to represent basis functions
@@ -75,23 +76,32 @@ class FBBasis2D(SteerableBasis2D, FBBasisMixin):
         """
         Create the indices for each basis function
         """
+        #$# which angle
         indices_ells = np.zeros(self.count, dtype=int)
+        #$# which root
         indices_ks = np.zeros(self.count, dtype=int)
+        #$# which sign
         indices_sgns = np.zeros(self.count, dtype=int)
 
         # We'll also generate a mapping for complex construction
+        #$# how many nonnegative angle-based roots
         self.complex_count = sum(self.k_max)
         # These map indices in complex array to pair of indices in real array
+        #$# ranges indices for above arrays corresponding to positive vs negative sign
         self._pos = np.zeros(self.complex_count, dtype=int)
         self._neg = np.zeros(self.complex_count, dtype=int)
 
         i = 0
         ci = 0
+        #$# for each angular freq
         for ell in range(self.ell_max + 1):
+            #$# assign sign possibilities based on zero vs nonzero angular
             sgns = (1,) if ell == 0 else (1, -1)
+            #$# list root orders from 0 to however many - 1
             ks = np.arange(0, self.k_max[ell])
-
+            #$# for each sign
             for sgn in sgns:
+                #$# allocate at angular then sign then root basis
                 rng = np.arange(i, i + len(ks))
                 indices_ells[rng] = ell
                 indices_ks[rng] = ks

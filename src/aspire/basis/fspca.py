@@ -178,6 +178,33 @@ class FSPCABasis(SteerableBasis2D):
         #  Complete compression by mutating class
         self._compress()
 
+        self._update_fixed_angular_indices()
+
+    def _update_fixed_angular_indices(self):
+        angular_indices = self.complex_angular_indices
+        unique_anuglar_indices = np.unique(angular_indices)
+        fixed_angular_indices = {}
+        fixed_angular_dims = {}
+
+        for k in unique_anuglar_indices:
+            temp_indices = angular_indices == k
+            fixed_angular_indices[k] = temp_indices
+
+        self.fixed_angular_indices = fixed_angular_indices
+        self.k_max = unique_anuglar_indices[-1]
+
+    def generate_random_templates(self, num_templates):
+        """
+         generates random spherical templates
+        """
+        dimensionality = self.complex_count
+        random_templates = []
+        for i in range(num_templates):
+            z = np.squeeze(np.random.randn(dimensionality, 2).view(np.complex128))
+            z = z/np.linalg.norm(z)
+            random_templates.append(z)
+        return random_templates
+
     def _compute_spca(self):
         """
         Algorithm 2 from paper.
@@ -406,7 +433,7 @@ class FSPCABasis(SteerableBasis2D):
 
             pos_index = np.argmax(k_maps & q_maps & pos_mask)
             compressed_indices.append(pos_index)
-            if k > 0:
+            if k > 0: #$# k is always nonnegative, but when k is zero, only take positive index
                 neg_index = np.where(k_maps & q_maps & neg_mask)[0][0]
                 compressed_indices.append(neg_index)
         return compressed_indices

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
-from aspire.basis import FSPCABasis
+from aspire.basis import (FSPCABasis, SteerableBasis2D)
 from aspire.classification import (
     BFSReddyChatterjiAverager2D,
     Class2D,
@@ -28,9 +28,12 @@ class RIRClass2D(Class2D):
         alpha=1 / 3,
         sample_n=4000,
         bispectrum_components=300,
+        max_filter = False,
+        max_filter_method = "scipy",
         n_nbor=100,
         n_classes=50,
         bispectrum_freq_cutoff=None,
+        num_templates = None,
         large_pca_implementation="legacy",
         nn_implementation="legacy",
         bispectrum_implementation="legacy",
@@ -65,6 +68,7 @@ class RIRClass2D(Class2D):
         :param n_nbor: Number of nearest neighbors to compute.
         :param n_classes: Number of class averages to return.
         :param bispectrum_freq_cutoff: Truncate (zero) high k frequecies above (int) value, defaults off (None).
+        :param num_templates: Number of templates for max filtering layer
         :param large_pca_implementation: See `pca`.
         :param nn_implementation: See `nn_classification`.
         :param bispectrum_implementation: See `bispectrum`.
@@ -129,6 +133,9 @@ class RIRClass2D(Class2D):
             )
         self._bispectrum = bispectrum_implementations[bispectrum_implementation]
 
+        self.max_filter_bool = max_filter
+        self. max_filter_method = max_filter_method
+
         # Setup class selection
         if selector is None:
             selector = RandomClassSelector(seed=self.seed)
@@ -163,8 +170,13 @@ class RIRClass2D(Class2D):
             # Default of 400 components was taken from legacy reearch and code.
             fspca_components = 400
 
+        if num_templates is None:
+            num_templates = 4*fspca_components
+
         self.fspca_components = fspca_components
         self.bispectrum_components = bispectrum_components
+        self.num_templates = num_templates
+
         # Similarly, for small problems we need to check these counts.
         if fspca_components < bispectrum_components:
             raise RuntimeError(
@@ -198,6 +210,15 @@ class RIRClass2D(Class2D):
             self.pca_basis = FSPCABasis(
                 self.src, components=self.fspca_components, batch_size=self.batch_size
             )
+        
+        if self.max_filter_bool:
+            max_filter_method = self.max_filter_method
+            max_filter_implementations = self.pca_basis.get_max_filter_implementations()
+            if max_filter_method not in max_filter_implementations:
+                raise ValueError(
+                    f"Provided max_filter_method={max_filter_method} not in {max_filter_implementations.key()}"
+                )
+            self.max_filter_method = max_filter_implementations[max_filter_method]
 
         # For convenience, assign the fb_basis used in the pca_basis.
         self.fb_basis = self.pca_basis.basis
@@ -221,10 +242,14 @@ class RIRClass2D(Class2D):
         self.fspca_coef = self.pca_basis.spca_coef
 
         # Compute Bispectrum
-        coef_b, coef_b_r = self.bispectrum(self.fspca_coef)
+        if  self.max_filter_bool == True :
+            coef_b, coef_b_r = self._max_filter(self.fspca_coef)
+        else:
+            coef_b, coef_b_r = self.bispectrum(self.fspca_coef)
 
         # # Stage 2: Compute Nearest Neighbors
         logger.info(f"Calculate Nearest Neighbors using {self._nn_implementation}.")
+        
         classes, reflections, distances = self.nn_classification(coef_b, coef_b_r)
 
         if diagnostics:
@@ -443,6 +468,29 @@ class RIRClass2D(Class2D):
         coef_b_r /= np.linalg.norm(coef_b_r, axis=1)[:, np.newaxis]
 
         return coef_b, coef_b_r
+
+    # this was before adding reflection to max_filter computations
+    def _nn_max_filter(self, coeff_b):
+        X = np.column_stack((coeff_b.real, coeff_b.imag))
+        nbrs = NearestNeighbors(n_neighbors=self.n_nbor, algorithm="auto").fit(X)
+        distances, classes = nbrs.kneighbors(X)
+
+        return classes, distances
+
+    def _max_filter(self, coef):
+        coef = self.pca_basis.to_complex(coef)
+
+        template_bank = self.pca_basis.generate_random_templates(self.num_templates)
+
+        max_filter_bank = []
+        max_filter_bank_refl = []
+
+        for i in trange(self.src.n):
+            output = self.pca_basis.max_filter_bank(coef[i], template_bank, self.max_filter_method)
+            max_filter_bank.append(output[0])
+            max_filter_bank_refl.append(output[1])
+
+        return np.array(max_filter_bank), np.array(max_filter_bank_refl)
 
     def _devel_bispectrum(self, coef):
         coef = self.pca_basis.to_complex(coef)
