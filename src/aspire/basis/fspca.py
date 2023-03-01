@@ -1,5 +1,6 @@
 import logging
 from collections import OrderedDict
+import random
 
 import numpy as np
 
@@ -204,6 +205,15 @@ class FSPCABasis(SteerableBasis2D):
             z = z/np.linalg.norm(z)
             random_templates.append(z)
         return random_templates
+
+    def select_random_templates(self, complex_coef, num_templates):
+        number_of_rows = complex_coef.shape[0]
+        random_indices = np.random.choice(number_of_rows, 
+                                  size=num_templates, 
+                                  replace=True)
+        result = np.copy(complex_coef)
+        return result[random_indices]
+
 
     def _compute_spca(self):
         """

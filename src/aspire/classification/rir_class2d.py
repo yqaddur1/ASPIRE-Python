@@ -480,7 +480,7 @@ class RIRClass2D(Class2D):
     def _max_filter(self, coef):
         coef = self.pca_basis.to_complex(coef)
 
-        template_bank = self.pca_basis.generate_random_templates(self.num_templates)
+        template_bank = self.pca_basis.select_random_templates(self.num_templates)
 
         max_filter_bank = []
         max_filter_bank_refl = []
