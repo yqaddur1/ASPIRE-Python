@@ -151,6 +151,7 @@ class FSPCABasis(SteerableBasis2D):
         cov2d = BatchedRotCov2D(
             src=self.src, basis=self.basis, batch_size=self.batch_size
         )
+
         covar_opt = {
             "shrinker": "frobenius_norm",
             "verbose": 0,
@@ -194,6 +195,12 @@ class FSPCABasis(SteerableBasis2D):
         self.fixed_angular_indices = fixed_angular_indices
         self.k_max = unique_anuglar_indices[-1]
 
+    def get_max_filter_template_selection_methods(self):
+        return {
+            "random_gaussian": self.generate_random_templates,
+            "random_source": self.select_random_templates,
+        }
+
     def generate_random_templates(self, num_templates):
         """
          generates random spherical templates
@@ -206,7 +213,8 @@ class FSPCABasis(SteerableBasis2D):
             random_templates.append(z)
         return random_templates
 
-    def select_random_templates(self, complex_coef, num_templates):
+    def select_random_templates(self, num_templates):
+        complex_coef = self.to_complex(self.spca_coef)
         number_of_rows = complex_coef.shape[0]
         random_indices = np.random.choice(number_of_rows, 
                                   size=num_templates, 

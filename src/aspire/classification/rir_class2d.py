@@ -30,6 +30,8 @@ class RIRClass2D(Class2D):
         bispectrum_components=300,
         max_filter = False,
         max_filter_method = "scipy",
+        max_filter_fft_padding = 100,
+        max_filter_template_selection = "random_source",
         n_nbor=100,
         n_classes=50,
         bispectrum_freq_cutoff=None,
@@ -134,7 +136,9 @@ class RIRClass2D(Class2D):
         self._bispectrum = bispectrum_implementations[bispectrum_implementation]
 
         self.max_filter_bool = max_filter
-        self. max_filter_method = max_filter_method
+        self.max_filter_fft_padding = max_filter_fft_padding
+        self.max_filter_method = max_filter_method
+        self.max_filter_template_selection = max_filter_template_selection
 
         # Setup class selection
         if selector is None:
@@ -213,12 +217,19 @@ class RIRClass2D(Class2D):
         
         if self.max_filter_bool:
             max_filter_method = self.max_filter_method
+            template_selection = self.max_filter_template_selection
             max_filter_implementations = self.pca_basis.get_max_filter_implementations()
+            template_selection_methods = self.pca_basis.get_max_filter_template_selection_methods()
             if max_filter_method not in max_filter_implementations:
                 raise ValueError(
                     f"Provided max_filter_method={max_filter_method} not in {max_filter_implementations.key()}"
                 )
+            if template_selection not in template_selection_methods:
+                raise ValueError(
+                    f"Provided template_selection_method={template_selection} not in {template_selection_methods.key()}"
+                )
             self.max_filter_method = max_filter_implementations[max_filter_method]
+            self.template_selection_method = template_selection_methods[template_selection]
 
         # For convenience, assign the fb_basis used in the pca_basis.
         self.fb_basis = self.pca_basis.basis
@@ -480,13 +491,13 @@ class RIRClass2D(Class2D):
     def _max_filter(self, coef):
         coef = self.pca_basis.to_complex(coef)
 
-        template_bank = self.pca_basis.select_random_templates(self.num_templates)
+        template_bank = self.template_selection_method(self.num_templates)
 
         max_filter_bank = []
         max_filter_bank_refl = []
 
         for i in trange(self.src.n):
-            output = self.pca_basis.max_filter_bank(coef[i], template_bank, self.max_filter_method)
+            output = self.pca_basis.max_filter_bank(coef[i], template_bank, self.max_filter_method, self.max_filter_fft_padding)
             max_filter_bank.append(output[0])
             max_filter_bank_refl.append(output[1])
 

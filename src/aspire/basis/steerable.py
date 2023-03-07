@@ -5,6 +5,7 @@ from collections import OrderedDict
 import numpy as np
 
 from scipy.optimize import minimize_scalar
+from numpy.fft import fft
 
 from aspire.basis import Basis
 from aspire.utils import complex_type
@@ -31,10 +32,11 @@ class SteerableBasis2D(Basis):
     def get_max_filter_implementations(self):
         return {
             "companion": self.max_filter_companion,
-            "scipy": self.max_filter_scipy
+            "scipy": self.max_filter_scipy,
+            "fft": self.max_filter_fft,
         }
 
-    def max_filter_bank(self, complex_coef, template_bank, max_filter_method):
+    def max_filter_bank(self, complex_coef, template_bank, max_filter_method, max_filter_fft_padding):
         """
         NOTE THIS IS ONLY FOR NONNEGATIVE K
         Method
@@ -50,6 +52,7 @@ class SteerableBasis2D(Basis):
         """
 
         # want to max-filter with coefficients due to high dimensionality of images coordinate-basis
+        self.max_filter_fft_padding = max_filter_fft_padding
 
         num_templates = len(template_bank)
 
@@ -66,12 +69,64 @@ class SteerableBasis2D(Basis):
 
         return max_filter_output, max_filter_output_refl
     
+    def max_filter_bank_fft(self, complex_coef, template_bank, max_filter_fft_padding):
+        """
+        NOTE THIS IS ONLY FOR NONNEGATIVE K
+        Method
+        want to get positive coefs, 
+        arrange them into vectors based on positive angular index
+        take hermitian product
+        create matrix
+        get eigenvalues
+        check which are unit and find roots and find max
+        :param filter_bank is a list of dictionaries. 
+                Length is number of templates, keys are angular indices, values are numpy complex coefficients
+        :return:
+        """
+
+        # want to max-filter with coefficients due to high dimensionality of images coordinate-basis
+        self.max_filter_fft_padding = max_filter_fft_padding
+
+        num_templates = len(template_bank)
+
+        max_filter_output = []
+        max_filter_output_refl = []
+
+        reflected_coef = self.reflection_transformation(complex_coef.copy())
+
+        for i in range(num_templates):
+            maxval = self.max_filter_fft(complex_coef, template_bank[i])
+            max_filter_output.append(maxval)
+            maxval_refl = self.max_filter_fft(reflected_coef, template_bank[i])
+            max_filter_output_refl.append(maxval_refl)
+
+        return max_filter_output, max_filter_output_refl
+
     def reflection_transformation(self, complex_coef):
         fixed_angular_indices = self.fixed_angular_indices
         for k, k_indices in fixed_angular_indices.items():
             complex_coef[k_indices] = np.power(-1, k)*np.conj(complex_coef[k_indices])
         return complex_coef
-    
+
+    def max_filter_fft(self, complex_coef, template, padding = 0):
+        if hasattr(self, "max_filter_fft_padding"):
+            padding = self.max_filter_fft_padding
+
+        fixed_angular_indices = self.fixed_angular_indices
+        k_max = self.k_max
+
+        inner_with_zeros = np.zeros(k_max + padding + 1, dtype=complex)
+        for k, k_indices in fixed_angular_indices.items():
+            zk = complex_coef[k_indices]
+            wk = template[k_indices]
+            inner_with_zeros[k] = np.vdot(zk,wk)
+        
+        transformed_inner = fft(inner_with_zeros)
+        real_part = np.real(transformed_inner)
+
+        return max(real_part)
+        
+
     def max_filter_scipy_objective(self, theta):
         current_value = 0
         for k, inner_k in self.inner_products_temp.items():
