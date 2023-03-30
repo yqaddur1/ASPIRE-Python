@@ -199,8 +199,12 @@ class FSPCABasis(SteerableBasis2D):
         return {
             "random_gaussian": self.generate_random_templates,
             "random_source": self.select_random_templates,
+            "explicit": self.explicit_templates,
         }
 
+    def explicit_templates(self, templates):
+        return self.to_complex(self.expand_from_image_basis(templates))
+    
     def generate_random_templates(self, num_templates):
         """
          generates random spherical templates

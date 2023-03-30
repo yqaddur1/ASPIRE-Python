@@ -35,7 +35,7 @@ class RIRClass2D(Class2D):
         n_nbor=100,
         n_classes=50,
         bispectrum_freq_cutoff=None,
-        num_templates = None,
+        templates = None,
         large_pca_implementation="legacy",
         nn_implementation="legacy",
         bispectrum_implementation="legacy",
@@ -174,12 +174,12 @@ class RIRClass2D(Class2D):
             # Default of 400 components was taken from legacy reearch and code.
             fspca_components = 400
 
-        if num_templates is None:
-            num_templates = 4*fspca_components
+        if templates is None:
+            templates = 4*fspca_components
 
         self.fspca_components = fspca_components
         self.bispectrum_components = bispectrum_components
-        self.num_templates = num_templates
+        self.templates = templates
 
         # Similarly, for small problems we need to check these counts.
         if fspca_components < bispectrum_components:
@@ -491,7 +491,7 @@ class RIRClass2D(Class2D):
     def _max_filter(self, coef):
         coef = self.pca_basis.to_complex(coef)
 
-        template_bank = self.template_selection_method(self.num_templates)
+        template_bank = self.template_selection_method(self.templates)
 
         max_filter_bank = []
         max_filter_bank_refl = []
