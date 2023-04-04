@@ -95,3 +95,6 @@ venv.bak/
 
 # Generated documentation
 docs/source/
+
+# Map Data
+aspire-code/volume/map_data
