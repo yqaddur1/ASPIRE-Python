@@ -146,7 +146,8 @@ class ClassAvgSource(ImageSource):
 
         :return: Numpy array, integers.
         """
-        self._classify()
+        if not self._classified:
+            self._classify()
         return super().class_indices
 
     @class_indices.setter
