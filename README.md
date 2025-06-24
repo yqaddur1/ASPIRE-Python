@@ -1,72 +1,68 @@
-![Logo](http://spr.math.princeton.edu/sites/spr.math.princeton.edu/files/ASPIRE_1.jpg)
+# ASPIRE – Algorithms for Single Particle Reconstruction with Max Filtering
 
-[![Github Actions Status](https://github.com/ComputationalCryoEM/ASPIRE-Python/actions/workflows/workflow.yml/badge.svg)](https://github.com/ComputationalCryoEM/ASPIRE-Python/actions/workflows/workflow.yml)
-[![codecov](https://codecov.io/gh/ComputationalCryoEM/ASPIRE-Python/branch/main/graph/badge.svg?token=3XFC4VONX0)](https://codecov.io/gh/ComputationalCryoEM/ASPIRE-Python)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5657281.svg)](https://doi.org/10.5281/zenodo.5657281)
-[![Downloads](https://static.pepy.tech/badge/aspire/month)](https://pepy.tech/project/aspire)
+> 🚧 **Work in Progress**  
+> This is an active research and development project. Features and results are evolving, and parts of the codebase may change frequently.
 
-# ASPIRE - Algorithms for Single Particle Reconstruction - v0.13.2
+**ASPIRE** is an open-source software package for processing single-particle cryo-EM data to determine the three-dimensional structures of biological macromolecules. The package includes advanced algorithms grounded in rigorous mathematics, statistics, and machine learning.
 
-The ASPIRE-Python project supersedes [Matlab ASPIRE](https://github.com/PrincetonUniversity/aspire).
+ASPIRE offers unique and improved solutions to major computational challenges in the cryo-EM processing pipeline, including:
 
-ASPIRE is an open-source software package for processing single-particle cryo-EM data to determine three-dimensional structures of biological macromolecules. The package includes advanced algorithms based on rigorous mathematics and recent developments in
-statistics and machine learning. It provides unique and improved solutions to important computational challenges of the cryo-EM
-processing pipeline, including 3-D *ab-initio* modeling, 2-D class averaging, automatic particle picking, and 3-D heterogeneity analysis.
+- 3D *ab initio* modeling  
+- 2D class averaging  
+- Automatic particle picking  
+- 3D heterogeneity analysis
 
-For more information about the project, algorithms, and related publications please refer to the [ASPIRE Project website](http://spr.math.princeton.edu/).
+🔗 For more information about ASPIRE and its algorithms, visit the [ASPIRE Project website](http://spr.math.princeton.edu/).  
+📘 Full documentation and tutorials are available [here](https://computationalcryoem.github.io/ASPIRE-Python).
 
-**For full documentation and tutorials see [the docs](https://computationalcryoem.github.io/ASPIRE-Python).**
+---
 
-Please cite using the following DOI. This DOI represents all versions, and will always resolve to the latest one.
+## My Contribution
 
-```
-ComputationalCryoEM/ASPIRE-Python: v0.13.2 https://doi.org/10.5281/zenodo.5657281
+In this project, I am modifying the **bispectrum embedding** [1] used in ASPIRE by replacing it with **max filter banks** [2,3,4]. I am also developing methods to **train or select these filters** to improve denoising performance on cryo-EM images.
 
-```
+Development is primarily taking place on the `develop` branch.
+
+---
 
 ## Installation Instructions
 
-Getting Started - Installation
-------------------------------
+To set up ASPIRE using Anaconda (recommended):
 
-ASPIRE is a pip-installable package for Linux/Mac/Windows, and
-requires Python 3.9-3.12. The recommended method of installation for
-getting started is to use Anaconda (64-bit) for your platform to
-install Python. Python's package manager `pip` can then be used to
-install `aspire` safely in that environment.
+```bash
+cd /path/to/git/clone/folder
 
-If you are unfamiliar with `conda`, the
-[Miniconda](https://docs.conda.io/en/latest/miniconda.html)
-distribution for `x86_64` is recommended.
+# Create the conda environment and install base dependencies
+conda env create -f environment.yml --name aspire_dev
 
-Assuming you have `conda` and a compatible system, the following steps
-will checkout current code release, create an environment, and install
-ASPIRE.
+# Activate the environment
+conda activate aspire_dev
 
-```
-# Clone the code
-git clone https://github.com/ComputationalCryoEM/ASPIRE-Python.git
-cd ASPIRE-Python
-
-# Create a fresh environment
-conda create --name aspire python=3.9 pip
-
-# Enable the environment
-conda activate aspire
-
-# Install the `aspire` package from the checked out code
-# with the additional `dev` extension.
+# Install the ASPIRE package in editable mode with developer tools
 pip install -e ".[dev]"
 ```
 
-If you prefer not to use Anaconda, or have other preferences for managing environments, you should be able to directly use `pip` with Python >= 3.9 from the local checkout or via PyPI.
-Please see the full documentation for details and advanced instructions.
+If you prefer not to use Anaconda, you can also install dependencies via `pip` with Python ≥ 3.7. See the [documentation](https://computationalcryoem.github.io/ASPIRE-Python) for details.
 
-### Installation Testing
+---
 
-To check the installation, a unit test suite is provided,
-taking approximate 15 minutes on an average machine.
+## Run Tests
 
-```
+To verify that everything is working, run:
+
+```bash
+cd /path/to/git/clone/folder
 pytest
 ```
+
+---
+
+## References
+
+[1] Z. Zhao, A. Singer, *Rotationally invariant image representation for viewing direction classification in cryo-EM*, J. Struct. Biol. **186**.1 (2014) 153–166.  
+
+[2] J. Cahill, J. W. Iverson, D. G. Mixon, D. Packer, *Group-invariant max filtering*, Found. Comput. Math. (2024) 1–38.  
+
+[3] D. G. Mixon, **Y. Qaddura**, *Injectivity, stability and positive definiteness of max filtering*, Constr. Approx. (2025).  
+
+[4] **Y. Qaddura**, *A max filtering local stability theorem with application to weighted phase retrieval and cryo-EM*, arXiv:2403.14042.
