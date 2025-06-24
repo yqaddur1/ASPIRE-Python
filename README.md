@@ -60,6 +60,9 @@ pytest
 ## References
 
 [1] Z. Zhao, A. Singer, *Rotationally invariant image representation for viewing direction classification in cryo-EM*, J. Struct. Biol. **186**.1 (2014) 153–166.  
+
 [2] J. Cahill, J. W. Iverson, D. G. Mixon, D. Packer, *Group-invariant max filtering*, Found. Comput. Math. (2024) 1–38.  
+
 [3] D. G. Mixon, **Y. Qaddura**, *Injectivity, stability and positive definiteness of max filtering*, Constr. Approx. (2025).  
+
 [4] **Y. Qaddura**, *A max filtering local stability theorem with application to weighted phase retrieval and cryo-EM*, arXiv:2403.14042.
