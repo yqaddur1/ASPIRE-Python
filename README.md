@@ -1,5 +1,8 @@
 # ASPIRE – Algorithms for Single Particle Reconstruction with Max Filtering
 
+> 🚧 **Work in Progress**  
+> This is an active research and development project. Features and results are evolving, and parts of the codebase may change frequently.
+
 **ASPIRE** is an open-source software package for processing single-particle cryo-EM data to determine the three-dimensional structures of biological macromolecules. The package includes advanced algorithms grounded in rigorous mathematics, statistics, and machine learning.
 
 ASPIRE offers unique and improved solutions to major computational challenges in the cryo-EM processing pipeline, including:
